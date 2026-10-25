@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "node ../../scripts/smoke/sales-dashboard.mjs"
   },
   "dependencies": {
     "dotenv": "^17.2.1",

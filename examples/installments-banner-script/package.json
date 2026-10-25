@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsx build.ts",
     "serve": "tsx server.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "node ../../scripts/smoke/store-script.mjs installments-banner-script"
   },
   "dependencies": {
     "express": "^5.1.0"

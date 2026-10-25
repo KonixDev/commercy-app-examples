@@ -1,5 +1,7 @@
 # Apps de ejemplo para Commercy
 
+[![CI](https://github.com/KonixDev/commercy-app-examples/actions/workflows/ci.yml/badge.svg)](https://github.com/KonixDev/commercy-app-examples/actions/workflows/ci.yml)
+
 Apps de ejemplo **completas y funcionales** para la [plataforma de apps de Commercy](https://commercy.com.ar/developers), el e-commerce + punto de venta + ERP argentino. Cada carpeta de `examples/` es independiente: la copiás, completás el `.env` y la corrés.
 
 - Portal de developers: <https://dev.commercy.com.ar>
@@ -25,6 +27,12 @@ Crear y probar apps es gratis, y Commercy **no cobra comisión** por las apps: s
 |---|---|
 | [`scripts/sri.mjs`](scripts/sri.mjs) | `node scripts/sri.mjs <archivo|URL>` calcula el hash SRI (`sha384-…`) que pide el portal para un script de tienda. Con una URL, además avisa si hay redirect, si falta CORS o si la URL no está versionada. |
 | [`scripts/sign-request.mjs`](scripts/sign-request.mjs) | `node scripts/sign-request.mjs <url> <secret> '<json>'` firma un pedido igual que Commercy (`X-Commercy-Signature` + `X-Commercy-Timestamp`) y lo envía. Sirve para probar tus endpoints sin una tienda real. |
+
+## Tests de humo
+
+Cada ejemplo tiene un `npm run smoke` que levanta su server con un `.env` de prueba (secretos falsos, sin red hacia Commercy), le habla con requests firmados como los de Commercy y lo apaga: firma válida → 2xx, firma inválida o timestamp viejo → 401, y lo propio de cada app (idempotencia, deduplicación, estados de pago). Los dos scripts de tienda compilan y verifican que el hash SRI de `dist/` coincida con el del manifest. El CI corre typecheck, build y smoke de los seis ejemplos en Node 20.12 y 22.
+
+Los smokes usan `scripts/` de este repo (`../../scripts/smoke`): si copiás un ejemplo solo, `npm run smoke` no está disponible, el resto funciona igual.
 
 ## Requisitos
 
