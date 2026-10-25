@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prueba local · botón de WhatsApp</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 24px; max-width: 760px; color: #1a1a1a; background: #fafafa; }
+    h1 { font-size: 1.25rem; margin-top: 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    button { font: inherit; padding: 6px 12px; cursor: pointer; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #111; color: #cfe; padding: 12px; min-height: 120px; max-height: 240px; overflow: auto; font-size: 13px; }
+    .hint { color: #555; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <h1>Prueba local · botón de WhatsApp</h1>
+  <p class="hint">
+    Simula lo que hace la tienda de Commercy: define un <code>window.Commercy</code> congelado, emite los eventos y
+    carga tu script con <code>integrity</code> + <code>crossorigin="anonymous"</code> (como el loader real) después de
+    la primera interacción. Herramienta de desarrollo: no forma parte del script que publicás.
+  </p>
+  <p class="hint">Hacé scroll, tocá la página o usá un botón: eso dispara la carga. <code>?commercy=0</code> prueba la página sin <code>window.Commercy</code>.</p>
+
+  <div class="row" id="nav">
+    <button data-go="home">Inicio</button>
+    <button data-go="catalog">Catálogo</button>
+    <button data-go="product-a">Producto A</button>
+    <button data-go="product-b">Producto con símbolos raros</button>
+    <button data-go="cart">Carrito</button>
+  </div>
+  <pre id="log" aria-live="polite"></pre>
+  <div style="height: 1200px"></div><!-- para poder hacer scroll -->
+
+  <script>
+  (function () {
+    'use strict';
+    var logEl = document.getElementById('log');
+    function log(msg) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+
+    function deepFreeze(o) {
+      Object.keys(o).forEach(function (k) { if (o[k] && typeof o[k] === 'object') deepFreeze(o[k]); });
+      return Object.freeze(o);
+    }
+
+    var CURRENCY = 'ARS';
+    var PRODUCTS = {
+      'product-a': { id: 'p1', name: 'Zapatillas Urbanas', price: 89999 },
+      'product-b': { id: 'p2', name: 'Remera "Básica" & Co. <b>XL</b>', price: 12500.5 }
+    };
+    var listeners = {};
+    var page = null;
+    var product = null;
+
+    function emit(name, payload) {
+      var frozen = deepFreeze(Object.assign({}, payload));
+      (listeners[name] || []).slice().forEach(function (cb) {
+        try { cb(frozen); } catch (e) { console.warn('[Commercy] Un listener de ' + name + ' tiró un error', e); }
+      });
+    }
+
+    function go(key) {
+      product = null;
+      if (key === 'home') page = { type: 'home', path: '/' };
+      else if (key === 'catalog') page = { type: 'catalog', path: '/productos' };
+      else if (key === 'cart') page = { type: 'cart', path: '/carrito' };
+      else { page = { type: 'product', path: '/productos/' + key }; product = PRODUCTS[key]; }
+      log('> ' + page.type + ' ' + page.path);
+      emit('page_viewed', page);
+      if (product) emit('product_viewed', { productId: product.id, name: product.name, price: product.price, currency: CURRENCY });
+    }
+
+    if (new URLSearchParams(location.search).get('commercy') !== '0') {
+      window.Commercy = Object.freeze({
+        version: 1,
+        store: deepFreeze({ id: 'store_1', shopId: null, name: 'Tienda de Prueba', domain: 'tienda-de-prueba.com.ar', currency: CURRENCY, locale: 'es-AR' }),
+        getPage: function () { return deepFreeze({ type: page.type, path: page.path, product: product ? { id: product.id, name: product.name, price: product.price } : null }); },
+        getCart: function () { return deepFreeze({ itemCount: 0, subtotal: 0, currency: CURRENCY, items: [] }); },
+        getCustomer: function () { return deepFreeze({ loggedIn: false }); },
+        on: function (event, cb) {
+          if (['page_viewed', 'product_viewed', 'product_added_to_cart', 'checkout_started'].indexOf(event) === -1 || typeof cb !== 'function') {
+            console.warn('[Commercy] on(event, cb): evento desconocido o callback que no es una función. Se ignora.');
+            return function () {};
+          }
+          (listeners[event] = listeners[event] || []).push(cb);
+          // Como el store real: reenvía el último page_viewed / product_viewed al suscribirse.
+          if (event === 'page_viewed' && page) {
+            var p = deepFreeze(Object.assign({}, page)); queueMicrotask(function () { cb(p); });
+          } else if (event === 'product_viewed' && product) {
+            var pv = deepFreeze({ productId: product.id, name: product.name, price: product.price, currency: CURRENCY });
+            queueMicrotask(function () { cb(pv); });
+          }
+          return function () { Commercy.off(event, cb); };
+        },
+        off: function (event, cb) { listeners[event] = (listeners[event] || []).filter(function (f) { return f !== cb; }); }
+      });
+      log('window.Commercy definido (congelado: ' + Object.isFrozen(window.Commercy) + ')');
+    } else {
+      log('window.Commercy NO definido (?commercy=0)');
+    }
+
+    go('home');
+    document.getElementById('nav').addEventListener('click', function (e) {
+      var key = e.target && e.target.getAttribute && e.target.getAttribute('data-go');
+      if (key && window.Commercy) go(key);
+    });
+
+    // --- Loader: imita al de Commercy (async, SRI, crossorigin, tras la primera interacción) ---
+    var loaded = false;
+    function load() {
+      if (loaded) return; loaded = true;
+      ['pointerdown', 'keydown', 'scroll', 'wheel', 'touchstart'].forEach(function (t) { window.removeEventListener(t, load, true); });
+      fetch('/manifest.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (m) {
+        var s = document.createElement('script');
+        s.src = '/' + m.file;
+        s.integrity = m.integrity;
+        s.crossOrigin = 'anonymous';
+        s.async = true;
+        s.onload = function () { log('script cargado: ' + m.file + ' (' + m.integrity.slice(0, 20) + '…)'); };
+        s.onerror = function () { log('ERROR: no se pudo cargar ' + m.file + '. Revisá el hash SRI, CORS y redirects.'); };
+        document.head.appendChild(s);
+      }).catch(function (e) { log('ERROR: no encontré /manifest.json (¿corriste npm run build?): ' + e); });
+    }
+    ['pointerdown', 'keydown', 'scroll', 'wheel', 'touchstart'].forEach(function (t) { window.addEventListener(t, load, { capture: true, passive: true }); });
+  })();
+  </script>
+</body>
+</html>
