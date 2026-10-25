@@ -15,6 +15,8 @@ declare const __CONFIG__: {
   installments: number;
   minAmount: number;
   anchor: string;
+  position: 'left' | 'right';
+  mobileBottomOffset: number;
 };
 
 const HOST_ID = 'commercy-app-installments';
@@ -29,11 +31,20 @@ const CSS = `
   padding: 10px 14px; margin: 8px 0;
 }
 .banner.fixed {
-  position: fixed; z-index: 2147482000; margin: 0;
-  left: calc(16px + env(safe-area-inset-left, 0px));
+  position: fixed; z-index: 99980; margin: 0;
+  ${__CONFIG__.position}: calc(16px + env(safe-area-inset-${__CONFIG__.position}, 0px));
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   max-width: min(420px, calc(100vw - 96px));
   box-shadow: 0 4px 14px rgba(0, 0, 0, .2);
+}
+/* Celulares: el cartel fijo deja libre la franja de abajo (barra de navegación de la tienda,
+   MOBILE_BOTTOM_OFFSET) y la columna del lado opuesto (16 + 56 + 12 px) para el botón de
+   WhatsApp, así no tapa controles ni se pisa con él. */
+@media (max-width: 767px) {
+  .banner.fixed {
+    bottom: calc(${__CONFIG__.mobileBottomOffset}px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100vw - 32px - 68px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  }
 }
 p { margin: 0; }
 strong { font-weight: 700; }
@@ -89,7 +100,7 @@ function start(C: NonNullable<Window['Commercy']>): void {
     try {
       anchor = __CONFIG__.anchor ? document.querySelector(__CONFIG__.anchor) : null;
     } catch {
-      // Selector inválido (BANNER_ANCHOR mal escrito): cae al lugar por defecto, flotante abajo a la izquierda.
+      // Selector inválido (BANNER_ANCHOR mal escrito): cae al lugar por defecto, flotante abajo (a un costado).
     }
     banner.classList.toggle('fixed', !anchor);
     if (anchor) anchor.insertAdjacentElement('afterend', host);

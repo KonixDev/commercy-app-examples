@@ -26,7 +26,8 @@ Ejemplos del mensaje en una tienda llamada «Casa Lola»:
 ## Cómo se ve
 
 Un círculo verde oscuro de 56 px con un ícono de teléfono blanco, fijo en la
-esquina inferior derecha. Para ver cómo queda sin una tienda, corré el ejemplo
+esquina inferior derecha. En celulares se sube por encima de la barra de
+navegación fija de la tienda (ver `MOBILE_BOTTOM_OFFSET`). Para ver cómo queda sin una tienda, corré el ejemplo
 y abrí la página de prueba (ver «Probarlo en local»).
 
 ### Accesibilidad y convivencia con la tienda
@@ -37,6 +38,11 @@ y abrí la página de prueba (ver «Probarlo en local»).
   de foco doble (blanco + negro) visible sobre cualquier fondo.
 - **Contraste**: ícono blanco sobre `#0b6b3a` = 6,6:1 (el verde de marca
   `#25D366` con blanco da ~2:1 y no pasa WCAG).
+- **No tapa la barra inferior de la tienda**: en pantallas de hasta 767 px el botón
+  se levanta `MOBILE_BOTTOM_OFFSET` px (72 por defecto) más el `safe-area` del
+  iPhone, y su `z-index` es alto pero no el máximo (`99990`), así que las capas de la
+  tienda (menús, modales) quedan por encima. Si instalás también el banner de cuotas,
+  quedan en lados opuestos (botón a la derecha, banner a la izquierda) y no se pisan.
 - **Target táctil** de 56 px, respeta `safe-area-inset` en iPhone, el movimiento
   reducido (`prefers-reduced-motion`) y no se imprime.
 - **Sin choques**: todo vive en un **shadow DOM** dentro de un único contenedor
@@ -78,20 +84,21 @@ npm run build
 | `WHATSAPP_MESSAGE` | Mensaje general. `{store}` = nombre de la tienda. |
 | `WHATSAPP_MESSAGE_PRODUCT` | Mensaje en la ficha de producto. `{store}` y `{product}`. |
 | `WIDGET_POSITION` | `right` (por defecto) o `left`. |
+| `MOBILE_BOTTOM_OFFSET` | Sólo celulares (pantallas de hasta 767 px): píxeles que se dejan libres abajo para no tapar la barra de navegación fija de la tienda (se le suma el `safe-area` del iPhone). Por defecto `72`; `0` si la tienda no tiene barra inferior. En escritorio no cambia nada. |
 | `SCRIPT_BASE_URL` | URL pública donde servís `dist/`. Sólo se usa para armar el bloque JSON. |
 
 `npm run build` genera `dist/whatsapp-widget.v<version>.js` (la versión sale del
 `package.json`) y muestra algo así:
 
 ```text
-OK  dist/whatsapp-widget.v1.0.0.js  (2.5 KB)
-SRI sha384-qbJYD4q0Qx+TEo6J0DHGLzuSGgzRk8yXmTzViCPlL8sPteQg7ewBEPfNcfHf3SqW
+OK  dist/whatsapp-widget.v1.1.0.js  (2.8 KB)
+SRI sha384-xQpJOG8kAfB4EoVc+klf+pS1hFfXVDPgX812neT8XF2u39V4hvzDfkyFEfQUXgmT
 
 {
   "handle": "whatsapp-widget",
   "name": "Botón de WhatsApp",
-  "src": "https://cdn.tuapp.com/whatsapp-widget.v1.0.0.js",
-  "integrity": "sha384-qbJYD4q0Qx+TEo6J0DHGLzuSGgzRk8yXmTzViCPlL8sPteQg7ewBEPfNcfHf3SqW",
+  "src": "https://cdn.tuapp.com/whatsapp-widget.v1.1.0.js",
+  "integrity": "sha384-xQpJOG8kAfB4EoVc+klf+pS1hFfXVDPgX812neT8XF2u39V4hvzDfkyFEfQUXgmT",
   "loading": "interaction",
   "consent": "necessary"
 }
@@ -114,7 +121,7 @@ Verificá el archivo servido con el script del repo, que calcula el hash y
 chequea redirects y CORS:
 
 ```bash
-node ../../scripts/sri.mjs https://algo.trycloudflare.com/whatsapp-widget.v1.0.0.js
+node ../../scripts/sri.mjs https://algo.trycloudflare.com/whatsapp-widget.v1.1.0.js
 ```
 
 El hash tiene que coincidir con el que imprimió el build. Si falta CORS, hay un
@@ -139,7 +146,7 @@ Si el hash no coincide, el navegador lo bloquea y lo ves en el log.
    | - | - |
    | `handle` | `whatsapp-widget` |
    | `name` | `Botón de WhatsApp` (lo ve el comercio) |
-   | `src` | `https://cdn.tuapp.com/whatsapp-widget.v1.0.0.js` (https, mismo dominio que tu `appUrl`) |
+   | `src` | `https://cdn.tuapp.com/whatsapp-widget.v1.1.0.js` (https, mismo dominio que tu `appUrl`) |
    | `integrity` | el `sha384-...` del build (o el botón **Calcular hash** del portal) |
    | `loading` | `interaction`: se carga tras el primer toque o scroll y no pesa en el Lighthouse |
    | `consent` | `necessary`: sin él no anda el botón que el comercio instaló, y no hace perfilado |
@@ -170,8 +177,8 @@ El hash está atado al contenido, así que **nunca pises el archivo en la misma 
 (todas las tiendas dejarían de cargarlo hasta que apruebe la revisión). `npm run build`
 te avisa si el archivo de esa versión ya existía con otro contenido.
 
-1. Subí `version` en `package.json` (por ejemplo a `1.1.0`).
-2. `npm run build`: genera `whatsapp-widget.v1.1.0.js` y su hash. **El v1.0.0 queda donde está.**
+1. Subí `version` en `package.json` (por ejemplo a `1.2.0`).
+2. `npm run build`: genera `whatsapp-widget.v1.2.0.js` y su hash. **El v1.1.0 queda donde está.**
 3. Publicá el archivo nuevo y dejá **vivo el viejo**: las tiendas siguen cargándolo
    hasta que se apruebe el cambio.
 4. En el portal cambiá `src` e `integrity`. Si tu app está publicada, el cambio pasa
@@ -192,7 +199,7 @@ configuración está dentro del archivo.
 - [ ] Sin datos personales: no lee formularios, cookies ni `localStorage`, y no manda nada a ningún lado.
 - [ ] No toca el checkout ni las rutas excluidas.
 - [ ] Todo en un closure, sin `document.write`, sin jQuery ni dependencia del tema.
-- [ ] Pesa poco (acá, ~2,5 KB; lo sugerido es hasta 256 KB) y no empeora el Lighthouse mobile.
+- [ ] Pesa poco (acá, ~2,8 KB; lo sugerido es hasta 256 KB) y no empeora el Lighthouse mobile.
 
 ## Adaptarlo
 

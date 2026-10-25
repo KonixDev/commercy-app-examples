@@ -48,6 +48,7 @@ cp .env.example .env
 | `COMMERCY_CLIENT_ID` / `COMMERCY_CLIENT_SECRET` | Credenciales OAuth de la app. Hacen falta para instalar y empujar seguimiento, no para cotizar/crear/cancelar. |
 | `APP_BASE_URL` | URL pública de esta app (la del túnel). Es la base de los `tracking_url` y, sin la barra final, tu `apiBaseUrl`. |
 | `PORT` | Puerto local, por defecto 3000. |
+| `COMMERCY_API_BASE` | API de Commercy. **Por defecto apunta a PRODUCCIÓN** (`https://api.commercy.com.ar`): para probar contra otro entorno (staging, local) tenés que setearla, si no el OAuth y el seguimiento van a producción. Sin barra final. |
 | `COMMERCY_API_VERSION` | Versión de la API pública (`2026-10`). |
 
 En el portal pedí el scope **`write_orders`** (incluye `read_orders`): sin `read_orders`

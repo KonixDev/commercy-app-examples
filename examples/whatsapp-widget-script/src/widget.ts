@@ -13,6 +13,7 @@ declare const __CONFIG__: {
   message: string;
   messageProduct: string;
   position: 'left' | 'right';
+  mobileBottomOffset: number;
 };
 
 const HOST_ID = 'commercy-app-whatsapp';
@@ -26,7 +27,7 @@ const CSS = `
   position: fixed;
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   ${__CONFIG__.position}: calc(16px + env(safe-area-inset-${__CONFIG__.position}, 0px));
-  z-index: 2147483000;
+  z-index: 99990;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 a {
@@ -42,6 +43,11 @@ a:hover { background: #095630; transform: scale(1.05); }
 a:focus-visible { outline: 3px solid #fff; outline-offset: 0; box-shadow: 0 0 0 6px #111; }
 svg { width: 30px; height: 30px; fill: currentColor; display: block; }
 @media (prefers-reduced-motion: reduce) { a { transition: none; } a:hover { transform: none; } }
+/* Celulares: dejamos libre la franja de abajo, donde muchas tiendas tienen una barra de
+   navegación fija (Inicio/Buscar/Carrito...). MOBILE_BOTTOM_OFFSET = alto de esa barra. */
+@media (max-width: 767px) {
+  .wrap { bottom: calc(${__CONFIG__.mobileBottomOffset}px + env(safe-area-inset-bottom, 0px)); }
+}
 @media print { .wrap { display: none; } }
 `;
 

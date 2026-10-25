@@ -52,6 +52,7 @@ cp .env.example .env
 | `COMMERCY_CLIENT_SECRET` | El `cs_...` de tu app. Se muestra una sola vez en el portal. |
 | `COMMERCY_WEBHOOK_SECRET` | El `whsec_...` del webhook, para verificar la firma. |
 | `APP_BASE_URL` | La URL pública de esta app (la del túnel). Tiene que coincidir EXACTO con la redirect URI registrada. |
+| `COMMERCY_API_BASE` | API de Commercy. **Por defecto apunta a PRODUCCIÓN** (`https://api.commercy.com.ar`): para probar contra otro entorno (staging, local) tenés que setearla, si no el OAuth y las consultas van a producción. Sin barra final. |
 | `PORT` | Puerto local, por defecto 3000. |
 | `DASHBOARD_TOKEN` | Opcional. **Demo: protegelo antes de exponerlo.** Si está seteado, `/dashboard` y `/api/*` exigen `?token=...` o `Authorization: Bearer ...`; si no, quedan sin autenticación y el server loguea un warning al arrancar. |
 

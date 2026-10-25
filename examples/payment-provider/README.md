@@ -84,7 +84,7 @@ cp .env.example .env
 | `COMMERCY_WEBHOOK_SECRET` | El `whsec_...` completo de tu app. Firma los requests de Commercy y el webhook que le mandás. |
 | `APP_BASE_URL` | URL pública de la app, la misma que cargás como `appUrl`. De acá sale el `checkout_url`. |
 | `COMMERCY_CLIENT_ID` / `COMMERCY_CLIENT_SECRET` | Credenciales OAuth. Sólo para `/install`. |
-| `COMMERCY_API_BASE` | API de Commercy (`https://api.commercy.com.ar`). |
+| `COMMERCY_API_BASE` | API de Commercy. **Por defecto apunta a PRODUCCIÓN** (`https://api.commercy.com.ar`): para probar contra otro entorno (staging, local) tenés que setearla, si no el OAuth y los webhooks van a producción. |
 | `PORT` | Puerto local, por defecto 3000. |
 | `DATA_FILE` | Archivo JSON de estado, por defecto `.data/state.json`. |
 

@@ -1,6 +1,6 @@
 {
   "name": "commercy-installments-banner-script",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Script de tienda para Commercy: banner «Hasta N cuotas sin interés» en la ficha de producto, con window.Commercy.",
   "type": "module",

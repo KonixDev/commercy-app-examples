@@ -20,6 +20,8 @@ const env = (name: string, fallback: string): string => process.env[name]?.trim(
 const installments = Number(env('INSTALLMENTS_COUNT', '6'));
 const minAmount = Number(env('INSTALLMENTS_MIN_AMOUNT', '20000'));
 const anchor = env('BANNER_ANCHOR', '');
+const position = env('BANNER_POSITION', 'left');
+const mobileBottomOffset = Number(env('MOBILE_BOTTOM_OFFSET', '72'));
 const baseUrl = env('SCRIPT_BASE_URL', 'https://cdn.tuapp.com').replace(/\/+$/, '');
 
 if (!Number.isInteger(installments) || installments < 2 || installments > 48) {
@@ -27,6 +29,12 @@ if (!Number.isInteger(installments) || installments < 2 || installments > 48) {
 }
 if (!Number.isFinite(minAmount) || minAmount < 0) {
   throw new Error(`INSTALLMENTS_MIN_AMOUNT inválido ("${minAmount}"): un número >= 0.`);
+}
+if (position !== 'left' && position !== 'right') {
+  throw new Error(`BANNER_POSITION inválido ("${position}"): usá "left" o "right".`);
+}
+if (!Number.isInteger(mobileBottomOffset) || mobileBottomOffset < 0 || mobileBottomOffset > 300) {
+  throw new Error(`MOBILE_BOTTOM_OFFSET inválido ("${mobileBottomOffset}"): un entero de píxeles entre 0 y 300.`);
 }
 
 const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
@@ -45,6 +53,8 @@ const result = await build({
     '__CONFIG__.installments': JSON.stringify(installments),
     '__CONFIG__.minAmount': JSON.stringify(minAmount),
     '__CONFIG__.anchor': JSON.stringify(anchor),
+    '__CONFIG__.position': JSON.stringify(position),
+    '__CONFIG__.mobileBottomOffset': JSON.stringify(mobileBottomOffset),
   },
 });
 

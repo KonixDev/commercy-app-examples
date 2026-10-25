@@ -34,6 +34,12 @@ versionada, CORS y `window.Commercy`.
 
 - **Cartel fijo** (por defecto): una tarjeta chica abajo a la izquierda, que deja
   libre la esquina derecha para un botón de chat. Funciona en cualquier tema.
+  En celulares (hasta 767 px) **no tapa la barra de navegación fija de la tienda**:
+  se levanta `MOBILE_BOTTOM_OFFSET` px (72 por defecto, más el `safe-area` del iPhone),
+  su ancho máximo reserva la columna del botón de WhatsApp y su `z-index` es alto pero
+  no el máximo (`99980`, siempre por debajo del botón: `99990`). Si usás también el
+  botón de WhatsApp a la izquierda (`WIDGET_POSITION=left`), compilá este con
+  `BANNER_POSITION=right`.
 - **Inline** (con `BANNER_ANCHOR`): se inserta justo después de un elemento de la
   ficha (por ejemplo el precio). Cada tema tiene su HTML: mirá el de tu tienda de
   prueba y poné un selector, como `.product-price`. Si el selector no existe, usa
@@ -76,20 +82,22 @@ npm run build
 | `INSTALLMENTS_COUNT` | Cantidad de cuotas (entero de 2 a 48). Por defecto 6. |
 | `INSTALLMENTS_MIN_AMOUNT` | Compra mínima, en la moneda de la tienda. Por defecto 20000. `0` = siempre. |
 | `BANNER_ANCHOR` | Selector CSS opcional para insertarlo inline. Vacío = cartel fijo. |
+| `BANNER_POSITION` | Lado del cartel fijo: `left` (por defecto) o `right`. Ponelo en el lado opuesto al botón de WhatsApp. No aplica con `BANNER_ANCHOR`. |
+| `MOBILE_BOTTOM_OFFSET` | Sólo celulares (hasta 767 px) y cartel fijo: píxeles que se dejan libres abajo para no tapar la barra de navegación fija de la tienda (se le suma el `safe-area` del iPhone). Por defecto `72`; `0` si la tienda no tiene barra inferior. En escritorio no cambia nada. |
 | `SCRIPT_BASE_URL` | URL pública donde servís `dist/`. Sólo se usa para armar el bloque JSON. |
 
 `npm run build` genera `dist/installments-banner.v<version>.js` (la versión sale
 del `package.json`) y muestra el hash y el bloque para el portal:
 
 ```text
-OK  dist/installments-banner.v1.0.0.js  (1.8 KB)
-SRI sha384-w610EfBR46T9Ixt6Qrz5bFFCeGqfgtTxfiqR4gozNOVLYi6yIhhGI1K279B04kLX
+OK  dist/installments-banner.v1.1.0.js  (2.3 KB)
+SRI sha384-tXbaSqeb428QsA1/gedkyox1dOqS27gwnPqUIMHCGGUy9FYWs/z0qh6cj4vrhWKG
 
 {
   "handle": "installments-banner",
   "name": "Banner de cuotas",
-  "src": "https://cdn.tuapp.com/installments-banner.v1.0.0.js",
-  "integrity": "sha384-w610EfBR46T9Ixt6Qrz5bFFCeGqfgtTxfiqR4gozNOVLYi6yIhhGI1K279B04kLX",
+  "src": "https://cdn.tuapp.com/installments-banner.v1.1.0.js",
+  "integrity": "sha384-tXbaSqeb428QsA1/gedkyox1dOqS27gwnPqUIMHCGGUy9FYWs/z0qh6cj4vrhWKG",
   "loading": "interaction",
   "consent": "necessary"
 }
@@ -112,7 +120,7 @@ Verificá el archivo servido con el script del repo, que calcula el hash y
 chequea redirects y CORS:
 
 ```bash
-node ../../scripts/sri.mjs https://algo.trycloudflare.com/installments-banner.v1.0.0.js
+node ../../scripts/sri.mjs https://algo.trycloudflare.com/installments-banner.v1.1.0.js
 ```
 
 El hash tiene que coincidir con el que imprimió el build. Si falta CORS, hay un
@@ -141,7 +149,7 @@ prueba tiene un `<p id="price">`).
    | - | - |
    | `handle` | `installments-banner` |
    | `name` | `Banner de cuotas` (lo ve el comercio) |
-   | `src` | `https://cdn.tuapp.com/installments-banner.v1.0.0.js` (https, mismo dominio que tu `appUrl`) |
+   | `src` | `https://cdn.tuapp.com/installments-banner.v1.1.0.js` (https, mismo dominio que tu `appUrl`) |
    | `integrity` | el `sha384-...` del build (o el botón **Calcular hash** del portal) |
    | `loading` | `interaction`: se carga tras el primer toque o scroll y no pesa en el Lighthouse |
    | `consent` | `necessary`: es la función que el comercio instaló y no hace perfilado |
@@ -172,8 +180,8 @@ El hash está atado al contenido, así que **nunca pises el archivo en la misma 
 (todas las tiendas dejarían de cargarlo hasta que apruebe la revisión). `npm run build`
 te avisa si el archivo de esa versión ya existía con otro contenido.
 
-1. Subí `version` en `package.json` (por ejemplo a `1.1.0`).
-2. `npm run build`: genera `installments-banner.v1.1.0.js` y su hash. **El v1.0.0 queda donde está.**
+1. Subí `version` en `package.json` (por ejemplo a `1.2.0`).
+2. `npm run build`: genera `installments-banner.v1.2.0.js` y su hash. **El v1.1.0 queda donde está.**
 3. Publicá el archivo nuevo y dejá **vivo el viejo**: las tiendas siguen cargándolo
    hasta que se apruebe el cambio.
 4. En el portal cambiá `src` e `integrity`. Si tu app está publicada, el cambio pasa
@@ -195,7 +203,7 @@ configuración está dentro del archivo.
 - [ ] No toca el checkout ni las rutas excluidas.
 - [ ] Todo en un closure, sin `document.write`, sin jQuery ni dependencia del tema.
 - [ ] El plan de cuotas que anuncia coincide con el que ofrece el checkout.
-- [ ] Pesa poco (acá, ~1,8 KB; lo sugerido es hasta 256 KB) y no empeora el Lighthouse mobile.
+- [ ] Pesa poco (acá, ~2,3 KB; lo sugerido es hasta 256 KB) y no empeora el Lighthouse mobile.
 
 ## Límites del ejemplo
 

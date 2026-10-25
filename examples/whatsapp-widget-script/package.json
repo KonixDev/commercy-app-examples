@@ -1,6 +1,6 @@
 {
   "name": "commercy-whatsapp-widget-script",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Script de tienda para Commercy: botón flotante de WhatsApp accesible, en shadow DOM, con window.Commercy.",
   "type": "module",

@@ -3,7 +3,7 @@
 //
 //   npm run build
 //
-// La configuración (número, mensajes, lado) se lee de `.env` o del entorno y queda
+// La configuración (número, mensajes, lado, margen inferior en celulares) se lee de `.env` o del entorno y queda
 // "horneada" dentro del archivo: cambiar un valor = archivo nuevo + hash nuevo.
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -21,6 +21,7 @@ const number = env('WHATSAPP_NUMBER', '5491112345678');
 const message = env('WHATSAPP_MESSAGE', 'Hola {store}! Quería hacerles una consulta.');
 const messageProduct = env('WHATSAPP_MESSAGE_PRODUCT', 'Hola {store}! Quería consultar por {product}.');
 const position = env('WIDGET_POSITION', 'right');
+const mobileBottomOffset = Number(env('MOBILE_BOTTOM_OFFSET', '72'));
 const baseUrl = env('SCRIPT_BASE_URL', 'https://cdn.tuapp.com').replace(/\/+$/, '');
 
 if (!/^\d{10,15}$/.test(number)) {
@@ -28,6 +29,9 @@ if (!/^\d{10,15}$/.test(number)) {
 }
 if (position !== 'left' && position !== 'right') {
   throw new Error(`WIDGET_POSITION inválido ("${position}"): usá "left" o "right".`);
+}
+if (!Number.isInteger(mobileBottomOffset) || mobileBottomOffset < 0 || mobileBottomOffset > 300) {
+  throw new Error(`MOBILE_BOTTOM_OFFSET inválido ("${mobileBottomOffset}"): un entero de píxeles entre 0 y 300.`);
 }
 
 const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
@@ -47,6 +51,7 @@ const result = await build({
     '__CONFIG__.message': JSON.stringify(message),
     '__CONFIG__.messageProduct': JSON.stringify(messageProduct),
     '__CONFIG__.position': JSON.stringify(position),
+    '__CONFIG__.mobileBottomOffset': JSON.stringify(mobileBottomOffset),
   },
 });
 

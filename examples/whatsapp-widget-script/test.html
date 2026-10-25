@@ -11,6 +11,17 @@
     button { font: inherit; padding: 6px 12px; cursor: pointer; }
     pre { white-space: pre-wrap; word-break: break-word; background: #111; color: #cfe; padding: 12px; min-height: 120px; max-height: 240px; overflow: auto; font-size: 13px; }
     .hint { color: #555; font-size: .9rem; }
+    /* Barra de navegación inferior fija, como la de la tienda real (sólo en pantallas chicas). */
+    #bottom-nav { display: none; }
+    @media (max-width: 767px) {
+      body { padding-bottom: 88px; }
+      #bottom-nav {
+        display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+        height: calc(64px + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px);
+        background: #fff; border-top: 1px solid #ccc;
+      }
+      #bottom-nav a { flex: 1; display: flex; align-items: center; justify-content: center; color: #111; text-decoration: none; font-size: .8rem; }
+    }
   </style>
 </head>
 <body>
@@ -20,7 +31,7 @@
     carga tu script con <code>integrity</code> + <code>crossorigin="anonymous"</code> (como el loader real) después de
     la primera interacción. Herramienta de desarrollo: no forma parte del script que publicás.
   </p>
-  <p class="hint">Hacé scroll, tocá la página o usá un botón: eso dispara la carga. <code>?commercy=0</code> prueba la página sin <code>window.Commercy</code>.</p>
+  <p class="hint">En pantallas chicas (hasta 767 px) hay una barra de navegación fija abajo para comprobar que el botón no la tapa. Hacé scroll, tocá la página o usá un botón: eso dispara la carga. <code>?commercy=0</code> prueba la página sin <code>window.Commercy</code>.</p>
 
   <div class="row" id="nav">
     <button data-go="home">Inicio</button>
@@ -30,6 +41,9 @@
     <button data-go="cart">Carrito</button>
   </div>
   <pre id="log" aria-live="polite"></pre>
+  <nav id="bottom-nav" aria-label="Navegación inferior de prueba">
+    <a href="#inicio" data-nav="inicio">Inicio</a><a href="#buscar" data-nav="buscar">Buscar</a><a href="#categorias" data-nav="categorias">Categorías</a><a href="#carrito" data-nav="carrito">Carrito</a><a href="#cuenta" data-nav="cuenta">Cuenta</a>
+  </nav>
   <div style="height: 1200px"></div><!-- para poder hacer scroll -->
 
   <script>
