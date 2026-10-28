@@ -26,6 +26,7 @@ jobs:
           - webhooks-starter
           - shipping-carrier
           - payment-provider
+          - terminal-provider
           - whatsapp-widget-script
           - installments-banner-script
         node: ["20.12", "22"]
@@ -49,6 +50,9 @@ jobs:
 
       - name: Build
         run: npm run build --if-present
+
+      - name: Test
+        run: npm test --if-present
 
       - name: Smoke
         run: npm run smoke

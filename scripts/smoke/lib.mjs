@@ -135,7 +135,7 @@ export async function expectRejected(t, url, body, secret, o = {}) {
 // ── Server del ejemplo ─────────────────────────────────────────────────────
 
 // Variables que un shell de desarrollo podría traer y pisarían al .env de prueba.
-const SCRUB = /^(COMMERCY_|APP_BASE_URL$|PORT$|DATA_FILE$|DASHBOARD_TOKEN$|DOTENV_)/;
+const SCRUB = /^(COMMERCY_|APP_BASE_URL$|PORT$|DATA_FILE$|DASHBOARD_TOKEN$|DOTENV_|ADMIN_TOKEN$|MODES$|CANCEL_MODE$|DEVICES$|AMOUNT_M(IN|AX)$|MERCHANT_|TRANSFER_)/;
 
 const live = new Set();
 function killGroup(child, signal) {

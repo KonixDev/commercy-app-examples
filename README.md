@@ -18,6 +18,7 @@ Crear y probar apps es gratis, y Commercy **no cobra comisión** por las apps: s
 | [`webhooks-starter`](examples/webhooks-starter) | El receptor de webhooks mínimo y correcto: firma HMAC, ventana de tiempo, deduplicación por `X-Commercy-Event-Id` y los 4 webhooks obligatorios. Punto de partida para cualquier integración. | [Webhooks](https://docs.commercy.com.ar/webhooks) |
 | [`shipping-carrier`](examples/shipping-carrier) | App de envíos: cotiza en el checkout, crea y cancela envíos de forma idempotente, y empuja el seguimiento a Commercy. | [Apps de envío](https://docs.commercy.com.ar/shipping-apps) |
 | [`payment-provider`](examples/payment-provider) | App de cobros: sesión de pago, checkout hospedado, webhook firmado hacia Commercy y estados `pending` / `approved` / `rejected` / `in_process`. | [Apps de pago](https://docs.commercy.com.ar/payment-apps) |
+| [`terminal-provider`](examples/terminal-provider) | App de cobro presencial (POS y kiosco): lista lectores, crea el cobro de forma idempotente, muestra QR EMVCo o datos de transferencia, cancela y avisa a Commercy con un aviso firmado. Incluye un simulador del procesador para probar el flujo completo. | [Apps de cobro presencial](https://docs.commercy.com.ar/pos-payment-apps) |
 | [`whatsapp-widget-script`](examples/whatsapp-widget-script) | Script para la tienda: botón flotante de WhatsApp que arma el mensaje con el producto que mira el comprador (`window.Commercy` + eventos). | [Scripts en la tienda](https://docs.commercy.com.ar/store-scripts) |
 | [`installments-banner-script`](examples/installments-banner-script) | Script para la tienda: banner «Hasta N cuotas sin interés de $X» en las fichas de producto. | [Scripts en la tienda](https://docs.commercy.com.ar/store-scripts) |
 
@@ -30,7 +31,7 @@ Crear y probar apps es gratis, y Commercy **no cobra comisión** por las apps: s
 
 ## Tests de humo
 
-Cada ejemplo tiene un `npm run smoke` que levanta su server con un `.env` de prueba (secretos falsos, sin red hacia Commercy), le habla con requests firmados como los de Commercy y lo apaga: firma válida → 2xx, firma inválida o timestamp viejo → 401, y lo propio de cada app (idempotencia, deduplicación, estados de pago). Los dos scripts de tienda compilan y verifican que el hash SRI de `dist/` coincida con el del manifest. El CI corre typecheck, build y smoke de los seis ejemplos en Node 20.12 y 22.
+Cada ejemplo tiene un `npm run smoke` que levanta su server con un `.env` de prueba (secretos falsos, sin red hacia Commercy), le habla con requests firmados como los de Commercy y lo apaga: firma válida → 2xx, firma inválida o timestamp viejo → 401, y lo propio de cada app (idempotencia, deduplicación, estados de pago). Los dos scripts de tienda compilan y verifican que el hash SRI de `dist/` coincida con el del manifest. El CI corre typecheck, build, tests (donde los hay) y smoke de los siete ejemplos en Node 20.12 y 22.
 
 Los smokes usan `scripts/` de este repo (`../../scripts/smoke`): si copiás un ejemplo solo, `npm run smoke` no está disponible, el resto funciona igual.
 
