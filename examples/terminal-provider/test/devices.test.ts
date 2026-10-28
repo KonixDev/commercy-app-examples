@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
-import { createBody, INSTALLATION, lookupBody, SHOP, startServer, type TestServer } from "./helpers.js";
+import { loadConfig } from "../src/config.js";
+import { createBody, INSTALLATION, lookupBody, SHOP, startServer, testConfig, type TestServer } from "./helpers.js";
 
 const CREATE = "/commercy/pos/payments";
 const STATUS = "/commercy/pos/payments/status";
@@ -78,5 +79,99 @@ describe("modo device", () => {
     assert.equal(details.installments, 6);
     assert.match(details.card_last4, /^\d{4}$/);
     assert.ok(details.auth_code.length <= 40);
+  });
+});
+
+describe("lectores por instalación", () => {
+  const A = "6710b3c2e4a1f20012ab34aa";
+  const B = "6710b3c2e4a1f20012ab34bb";
+  let srv: TestServer;
+  beforeEach(
+    async () =>
+      void (srv = await startServer(
+        testConfig({
+          devices: [],
+          devicesByInstallation: {
+            [A]: [{ id: "reader_a", label: "Caja A", status: "online" }],
+            [B]: [{ id: "reader_b", label: "Caja B", status: "online" }],
+          },
+        }),
+      )),
+  );
+  afterEach(() => srv.close());
+
+  const listOf = async (installation: string) => (await srv.post(DEVICES, { installation_id: installation, shop_id: SHOP }, { installation })).json.devices;
+  const charge = (installation: string, deviceId: string) =>
+    srv.post(CREATE, createBody({ installation_id: installation, mode: "device", device_id: deviceId }), { installation });
+
+  it("cada instalación lista sólo sus lectores; una desconocida, ninguno", async () => {
+    assert.deepEqual(await listOf(A), [{ id: "reader_a", label: "Caja A", status: "online" }]);
+    assert.deepEqual(await listOf(B), [{ id: "reader_b", label: "Caja B", status: "online" }]);
+    assert.deepEqual(await listOf("6710b3c2e4a1f20012ab34cc"), []);
+  });
+
+  it("A no puede cobrar en un lector de B (invalid_device) y cada una cobra en el suyo", async () => {
+    const cross = await charge(A, "reader_b");
+    assert.equal(cross.status, 422);
+    assert.equal(cross.json.error.code, "invalid_device");
+    assert.equal((await charge(A, "reader_a")).status, 200);
+    assert.equal((await charge(B, "reader_b")).status, 200);
+    assert.equal((await charge("6710b3c2e4a1f20012ab34cc", "reader_a")).json.error.code, "invalid_device");
+  });
+
+  it("ocupar el lector de A no cambia el de B, ni el simulador con installation_id", async () => {
+    await charge(A, "reader_a");
+    assert.equal((await listOf(A))[0].status, "busy");
+    assert.equal((await listOf(B))[0].status, "online");
+    await srv.admin("POST", "/devices/reader_b", { status: "offline", installation_id: B });
+    assert.equal((await listOf(B))[0].status, "offline");
+    assert.equal((await charge(B, "reader_b")).json.error.code, "device_offline");
+    assert.equal((await listOf(A))[0].status, "busy");
+  });
+
+  it("DEVICES como arreglo (demo): toda instalación ve los mismos lectores, con estado propio", async () => {
+    const demo = await startServer();
+    try {
+      const other = "6710b3c2e4a1f20012ab34dd";
+      await demo.post(CREATE, createBody({ mode: "device", device_id: "reader_01" }));
+      const mine = (await demo.post(DEVICES, { installation_id: INSTALLATION, shop_id: SHOP })).json.devices;
+      const theirs = (await demo.post(DEVICES, { installation_id: other, shop_id: SHOP }, { installation: other })).json.devices;
+      assert.equal(mine.find((d: { id: string }) => d.id === "reader_01").status, "busy");
+      assert.equal(theirs.find((d: { id: string }) => d.id === "reader_01").status, "online");
+    } finally {
+      await demo.close();
+    }
+  });
+});
+
+describe("charset del id de lector (el mismo que Commercy: A-Za-z0-9 _ . : -, 1 a 128, sin '..')", () => {
+  const env = { COMMERCY_WEBHOOK_SECRET: "s" };
+  const withDevices = (devices: unknown) => () => loadConfig({ ...env, DEVICES: JSON.stringify(devices) });
+
+  it("acepta ids válidos", () => {
+    const cfg = loadConfig({ ...env, DEVICES: JSON.stringify([{ id: "reader_01" }, { id: "Clover:ABC-1.2" }, { id: "a".repeat(128) }]) });
+    assert.equal(cfg.devices.length, 3);
+  });
+
+  it("rechaza al arrancar lo que Commercy descartaría de la lista", () => {
+    for (const id of ["lector 1", "a/b", "a?b", "a#b", "..", "a..b", "ñandú", "a".repeat(129), "caja!"]) {
+      assert.throws(withDevices([{ id }]), /DEVICES/, id);
+    }
+  });
+
+  it("DEVICES por instalación: valida cada lista", () => {
+    assert.throws(withDevices({ inst_1: [{ id: "a b" }] }), /DEVICES \(inst_1\)/);
+    assert.deepEqual(Object.keys(loadConfig({ ...env, DEVICES: JSON.stringify({ inst_1: [{ id: "r1" }] }) }).devicesByInstallation), ["inst_1"]);
+  });
+
+  it("el simulador y el cobro rechazan un device_id fuera del charset con 400", async () => {
+    const srv = await startServer();
+    try {
+      assert.equal((await srv.post(CREATE, createBody({ mode: "device", device_id: "reader 01" }))).status, 400);
+      assert.equal((await srv.post(CREATE, createBody({ mode: "device", device_id: "a..b" }))).status, 400);
+      assert.equal((await srv.admin("POST", "/devices/a..b", { status: "online", installation_id: INSTALLATION })).status, 400);
+    } finally {
+      await srv.close();
+    }
   });
 });

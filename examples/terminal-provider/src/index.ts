@@ -15,7 +15,7 @@ const { app } = createApp({ config, log });
 
 app.listen(config.port, () => {
   log(`Terminal Ejemplo escuchando en http://localhost:${config.port}`);
-  log(`  modos: ${config.modes.join(", ")} · cancelación: ${config.cancel} · lectores: ${config.devices.map((d) => d.id).join(", ")}`);
+  log(`  modos: ${config.modes.join(", ")} · cancelación: ${config.cancel} · lectores: ${Object.keys(config.devicesByInstallation).length > 0 ? `por instalación (${Object.keys(config.devicesByInstallation).length})` : config.devices.map((d) => d.id).join(", ")}`);
   log(`  avisos hacia: ${config.apiBase}${config.apiBase.includes("api.commercy.com.ar") ? "  (PRODUCCIÓN)" : ""}`);
   log(config.adminToken ? "  simulador: /admin (Authorization: Bearer <ADMIN_TOKEN>)" : "  simulador apagado: definí ADMIN_TOKEN para usar /admin");
 });

@@ -72,24 +72,29 @@ export interface NoticePayment {
 }
 
 export interface NoticeResult {
-  /** Commercy contestó 2xx (incluido 202: ya hay una consulta en curso para ese cobro). */
+  /** Commercy contestó 2xx. Un 202 (ya hay una consulta en curso para ese cobro) cuenta como entregado, pero se reintenta unos segundos después (ver `MAX_BUSY_RETRIES`). */
   delivered: boolean;
   /** HTTP de la respuesta, si hubo. */
   status?: number;
   error?: string;
-  /** El primer intento falló por algo transitorio y los reintentos siguen en segundo plano. */
+  /** El primer intento falló por algo transitorio (o fue un 202) y los reintentos siguen en segundo plano. */
   retrying: boolean;
 }
 
 export type Notify = (payment: NoticePayment) => Promise<NoticeResult>;
 
 export interface NotifyOptions {
-  /** Esperas entre reintentos ante 5xx, 429 o error de red. */
+  /** Esperas entre reintentos ante 5xx, 429, error de red o 202. */
   retryDelaysMs?: number[];
   log?: (...args: unknown[]) => void;
 }
 
 const DEFAULT_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000];
+/**
+ * Un 202 quiere decir que Commercy ya estaba consultando ese cobro: el estado que leyó puede ser anterior al cambio que avisás.
+ * Se reintenta unos segundos después, hasta 3 veces; si sigue en 202, la consulta de Commercy (y su barrido) lo alcanzan igual.
+ */
+const MAX_BUSY_RETRIES = 3;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -98,7 +103,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * El aviso NO lleva el estado: sólo dice qué cobro cambió. Commercy lo vuelve a consultar en tu `status` y nunca
  * aplica el contenido del aviso. Va con `Content-Type: application/json` (obligatorio) y firmado con tu secreto
  * vigente. Reintenta con espera creciente ante un 5xx, un 429 o un error de red; con 401/404 no tiene sentido
- * (secreto, reloj o id de instalación mal). Atiende hasta 120 avisos por minuto por instalación.
+ * (secreto, reloj o id de instalación mal). Ante un 202 (Commercy ya estaba consultando ese cobro) reintenta a los pocos segundos,
+ * hasta 3 veces. Atiende hasta 120 avisos por minuto por instalación.
  *
  * Devuelve después del PRIMER intento; los reintentos, si hacen falta, siguen en segundo plano.
  */
@@ -127,7 +133,7 @@ export async function notifyCommercy(
         signal: AbortSignal.timeout(20_000),
       });
       const delivered = res.status >= 200 && res.status < 300;
-      return { delivered, status: res.status, retrying: false, retryable: res.status >= 500 || res.status === 429 };
+      return { delivered, status: res.status, retrying: false, retryable: res.status >= 500 || res.status === 429 || res.status === 202 };
     } catch (err) {
       return { delivered: false, error: (err as Error).message, retrying: false, retryable: true };
     }
@@ -136,7 +142,7 @@ export async function notifyCommercy(
   const first = await attempt();
   const { retryable, ...result } = first;
   const tag = `[aviso→commercy] ${payment.paymentRef}`;
-  if (result.delivered) {
+  if (result.delivered && !retryable) {
     log(`${tag}: OK (HTTP ${result.status})`);
     return result;
   }
@@ -147,9 +153,15 @@ export async function notifyCommercy(
 
   log(`${tag}: ${result.error ?? `HTTP ${result.status}`}, se reintenta en segundo plano`);
   void (async () => {
+    let busyReplies = result.status === 202 ? 1 : 0;
     for (const delay of retryDelaysMs) {
       await sleep(delay);
       const next = await attempt();
+      if (next.status === 202) {
+        busyReplies += 1;
+        if (busyReplies > MAX_BUSY_RETRIES) return log(`${tag}: Commercy sigue consultando (202); lo alcanza su consulta`);
+        continue;
+      }
       if (next.delivered) return log(`${tag}: OK tras reintentar (HTTP ${next.status})`);
       if (!next.retryable) return log(`${tag}: ${next.error ?? `HTTP ${next.status}`} (se deja de reintentar)`);
     }

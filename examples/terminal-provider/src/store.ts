@@ -10,7 +10,7 @@
  * - Tu app no se entera de nada del comprador: sólo del número de venta, el monto, las cuotas y el modo.
  */
 import crypto from "node:crypto";
-import type { AppConfig, DeviceStatus, Mode } from "./config.js";
+import type { AppConfig, Device, DeviceStatus, Mode } from "./config.js";
 import { buildEmvQr, cleanText, type Display } from "./display.js";
 import { formatMoney, parseMoney } from "./money.js";
 
@@ -95,28 +95,56 @@ const fail = (httpStatus: number, code: string, message: string): { ok: false; h
 export class Store {
   private readonly payments = new Map<string, Payment>(); // payment_ref → cobro
   private readonly consumed = new Set<string>(); // refs por las que ya contestamos payment_not_found
-  private readonly deviceStatus = new Map<string, DeviceStatus>();
+  /** Lectores por instalación (y su estado), armados la primera vez que se la nombra. */
+  private readonly readers = new Map<string, Map<string, Device>>();
   private seq = 0;
 
-  constructor(private readonly config: AppConfig) {
-    for (const d of config.devices) this.deviceStatus.set(d.id, d.status);
-  }
+  constructor(private readonly config: AppConfig) {}
 
   // ── Dispositivos ─────────────────────────────────────────────────────────
 
-  /** Un lector con un cobro vivo está `busy`, sea cual sea su estado de conexión (salvo `offline`). */
+  /** Los lectores de una instalación: los suyos en `devicesByInstallation` o, si no figura, los de la demo. Una copia propia: el estado no se comparte. */
+  private readersOf(installationId: string): Map<string, Device> {
+    let m = this.readers.get(installationId);
+    if (!m) {
+      const seed = this.config.devicesByInstallation[installationId] ?? this.config.devices;
+      m = new Map(seed.map((d) => [d.id, { ...d }]));
+      this.readers.set(installationId, m);
+    }
+    return m;
+  }
+
+  /** Un lector con un cobro vivo está `busy`, sea cual sea su estado de conexión (salvo `offline`). Sólo los lectores de ESA instalación. */
   listDevices(installationId: string): Array<{ id: string; label?: string; status: DeviceStatus }> {
-    return this.config.devices.map((d) => {
-      const stored = this.deviceStatus.get(d.id) ?? "unknown";
-      const status = stored === "online" && this.deviceInUse(installationId, d.id) ? "busy" : stored;
+    return [...this.readersOf(installationId).values()].map((d) => {
+      const status = d.status === "online" && this.deviceInUse(installationId, d.id) ? "busy" : d.status;
       return { id: d.id, ...(d.label ? { label: d.label } : {}), status };
     });
   }
 
-  /** Simula que el lector se desconecta, se ocupa o vuelve (lo usa el simulador). Crea el lector si no existía. */
-  setDevice(id: string, status: DeviceStatus, label?: string): void {
-    if (!this.config.devices.some((d) => d.id === id)) this.config.devices.push({ id, ...(label ? { label } : {}), status });
-    this.deviceStatus.set(id, status);
+  /**
+   * Simula que el lector se desconecta, se ocupa o vuelve (lo usa el simulador). Con `installationId` crea el lector si no existía;
+   * sin él, sólo cambia los lectores que ya existen con ese id (en todas las instalaciones). Devuelve `false` si no tocó ninguno.
+   */
+  setDevice(id: string, status: DeviceStatus, label?: string, installationId?: string): boolean {
+    if (installationId) {
+      const mine = this.readersOf(installationId);
+      const nextLabel = label ?? mine.get(id)?.label;
+      mine.set(id, { id, status, ...(nextLabel ? { label: nextLabel } : {}) });
+      return true;
+    }
+    for (const installation of Object.keys(this.config.devicesByInstallation)) this.readersOf(installation);
+    // Las instalaciones que todavía no se nombraron arman sus lectores desde `config.devices`: ese molde también cambia.
+    const targets = [...this.readers.values(), new Map(this.config.devices.map((d) => [d.id, d]))];
+    let touched = false;
+    for (const m of targets) {
+      const d = m.get(id);
+      if (!d) continue;
+      d.status = status;
+      if (label) d.label = label;
+      touched = true;
+    }
+    return touched;
   }
 
   private deviceInUse(installationId: string, deviceId: string): boolean {
@@ -149,11 +177,12 @@ export class Store {
     }
     if (body.mode === "device") {
       const deviceId = body.device_id ?? "";
-      if (!this.config.devices.some((d) => d.id === deviceId)) {
-        // Un id mal tipeado no puede mandar la plata a otro comercio: tiene que ser un lector de ESTA instalación.
+      const reader = this.readersOf(body.installation_id).get(deviceId);
+      if (!reader) {
+        // Un id mal tipeado (o de otro comercio) no puede mandar la plata a otro lado: tiene que ser un lector de ESTA instalación.
         return fail(422, "invalid_device", "el lector no pertenece a la cuenta de esa instalación");
       }
-      const stored = this.deviceStatus.get(deviceId);
+      const stored = reader.status;
       if (stored === "offline") return fail(409, "device_offline", "el lector no está conectado");
       if (stored === "busy" || this.deviceInUse(body.installation_id, deviceId)) return fail(409, "device_busy", "el lector ya tiene un cobro en curso");
     }

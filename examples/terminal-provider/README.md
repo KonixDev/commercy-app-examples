@@ -32,7 +32,8 @@ Cajero / cliente        Commercy                               Tu app (Terminal 
 2. **Display.** Según el modo, la respuesta lleva lo que Commercy muestra: nada en `device`, un **QR EMVCo** en
    `qr`, e instrucciones + **datos de transferencia** (CVU, alias, titular, CUIT) en `none`.
 3. **Aviso.** Cuando el estado cambia le mandás `pos_payment.updated` firmado. **El aviso no lleva el estado**:
-   sólo dice qué cobro cambió. Commercy lo consulta con tu `status` y **nunca aplica el contenido del aviso**.
+   sólo dice qué cobro cambió. Commercy lo consulta con tu `status` y **nunca aplica el contenido del aviso**. Si contesta
+   `202` (ya estaba consultando ese cobro), el aviso se reintenta a los pocos segundos (hasta 3 veces).
 4. **Verificación.** `status` se resuelve **sólo por `payment_ref`** (el `payment_id` es opcional: la creación puede
    haberse cortado por timeout antes de que Commercy lo recibiera) y devuelve `amount_paid` como **total bruto
    cobrado**, con recargo y propina, antes de las comisiones.
@@ -88,7 +89,7 @@ cp .env.example .env
 | `MODES` | Modos que aceptás, separados por coma: `device,qr,none` (default: los tres). Un modo que no está acá da `not_available`. |
 | `CANCEL_MODE` | `sync` (default), `async` o `unsupported`. Tiene que coincidir con `cancel` en la declaración. |
 | `AMOUNT_MIN` / `AMOUNT_MAX` | Rango de monto, strings con dos decimales (default `1.00` y `500000.00`). Fuera de él: `amount_out_of_range`. |
-| `DEVICES` | JSON con los lectores: `[{"id":"reader_01","label":"Caja 1","status":"online"}]`. Default: `reader_01` y `reader_02`. |
+| `DEVICES` | JSON con los lectores. **Por instalación** (lo que hace un procesador real): `{"<installation_id>":[{"id":"reader_01","label":"Caja 1","status":"online"}]}`; cada instalación lista y cobra sólo en los suyos (los de otra, y las instalaciones que no figuran, dan `invalid_device`). Como arreglo `[{"id":"reader_01",...}]` toda instalación ve los mismos lectores (cada una con su propio estado): sólo para la demo. Default: ese arreglo con `reader_01` y `reader_02`. El `id` tiene que ser `A-Za-z0-9_.:-` (1 a 128 caracteres, sin `..`): **Commercy descarta en silencio de la lista los lectores con otro id**, así que no aparecen para vincular; la app los rechaza al arrancar. |
 | `MERCHANT_NAME` / `MERCHANT_CITY` | Nombre (hasta 25) y ciudad (hasta 15) que van dentro del QR EMVCo. El default lleva «Ñ» a propósito. |
 | `TRANSFER_CVU` / `TRANSFER_ALIAS` / `TRANSFER_HOLDER_NAME` / `TRANSFER_HOLDER_CUIT` | Datos de la transferencia del modo `none`. Los defaults son válidos pero **de mentira**. |
 | `PORT` | Puerto local, por defecto 3000. |
@@ -167,8 +168,8 @@ Cada acción **le avisa a Commercy** (`pos_payment.updated`) y devuelve el resul
 con `{ "notify": false }` cambia el estado sin avisar, para probar que Commercy también lo detecta consultando.
 Los montos van siempre como string.
 
-Para el estado de un lector: `POST /admin/devices/reader_01` con `{ "status": "offline" }` (o `online`, `busy`, `unknown`)
-y el próximo cobro en ese lector da `device_offline`. Un lector con un cobro vivo se lista como `busy` y da `device_busy`.
+Para el estado de un lector: `POST /admin/devices/reader_01` con `{ "status": "offline" }` (o `online`, `busy`, `unknown`;
+sumá `"installation_id"` para apuntar a la instalación, o para crear el lector en ella) y el próximo cobro en ese lector da `device_offline`. Un lector con un cobro vivo se lista como `busy` y da `device_busy`.
 
 ## Probar sin Commercy
 
@@ -238,13 +239,14 @@ npm run smoke       # levanta el server, le habla con requests firmados y lo apa
 - **Datos del comprador.** Tu app nunca los recibe: sólo el número de venta, el monto, las cuotas y el modo.
 - **Instalación.** Acepta cobros de cualquier instalación con firma válida. Un procesador real rechaza (`not_available`) las
   que no tengan alta y mapea cada `installation_id` a la cuenta del comercio en tu procesador; un `device_id` que no
-  pertenece a esa cuenta es `invalid_device`.
+  pertenece a esa cuenta es `invalid_device`. Los lectores van **por instalación** (`DEVICES` como objeto, ver arriba): `devices` lista sólo los de la
+  instalación que pregunta y un `device_id` de otra instalación es `invalid_device`.
 - **Display.** Se muestra siempre como texto o como un QR que dibuja Commercy, nunca como HTML ni imagen remota. En el modo `qr`
   también sirve una URL `https` de tu mismo dominio registrable que el `appUrl` (esta app usa un QR EMVCo porque un túnel de
   desarrollo no comparte dominio con nada).
 - **Rotación del secreto.** Mientras desplegás el secreto nuevo, definí `COMMERCY_WEBHOOK_SECRET_PREVIOUS`. Lo que te manda
   Commercy se firma con el secreto nuevo desde el momento de la rotación, y tus avisos se aceptan con cualquiera de los dos durante 72 horas.
-- **Aviso en segundo plano.** El primer intento va en el momento; si falla por un `5xx`, un `429` o la red, se reintenta con
+- **Aviso en segundo plano.** El primer intento va en el momento; si falla por un `5xx`, un `429` o la red (o Commercy contesta `202`, hasta 3 veces), se reintenta con
   espera creciente. Si el proceso cae a mitad de los reintentos se pierden; en producción usá una cola. Igual no se pierde
   el cobro: Commercy consulta el estado mientras el POS espera y su barrido sigue todo cobro que no terminó.
 

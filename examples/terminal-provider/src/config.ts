@@ -19,7 +19,10 @@ export interface AppConfig {
   adminToken: string | null;
   modes: Mode[];
   cancel: CancelMode;
+  /** Lectores de una instalación que no figura en `devicesByInstallation` (la demo: toda instalación ve los mismos). Vacío cuando `DEVICES` es un objeto por instalación. */
   devices: Device[];
+  /** Lectores por `installation_id`: una instalación sólo ve y cobra en los suyos. */
+  devicesByInstallation: Record<string, Device[]>;
   /** Rango de monto que aceptás (strings del contrato). */
   amountMin: string;
   amountMax: string;
@@ -46,24 +49,47 @@ export const DEFAULT_TRANSFER: Transfer = {
 
 const trimSlash = (url: string): string => url.replace(/\/+$/, "");
 
-function parseDevices(raw: string): Device[] {
+const DEVICE_ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/;
+
+/**
+ * Id de lector válido para Commercy: 1 a 128 caracteres `A-Za-z0-9 _ . : -`, sin `..`. Commercy descarta EN SILENCIO de la
+ * lista `devices` los lectores con otro id (no aparecen en el POS), y tampoco deja vincularlos a mano.
+ */
+export const isSafeDeviceId = (s: unknown): s is string => typeof s === "string" && DEVICE_ID_RE.test(s) && !s.includes("..");
+
+function parseDeviceList(parsed: unknown, where: string): Device[] {
+  if (!Array.isArray(parsed)) throw new Error(`DEVICES${where} tiene que ser un arreglo [{ id, label?, status? }]`);
+  const seen = new Set<string>();
+  return parsed.map((item: unknown) => {
+    const d = (item ?? {}) as Record<string, unknown>;
+    if (!isSafeDeviceId(d.id)) throw new Error(`DEVICES${where}: cada lector necesita un id de 1 a 128 caracteres A-Z a-z 0-9 _ . : - (sin "..")`);
+    if (seen.has(d.id)) throw new Error(`DEVICES${where}: id repetido (${d.id})`);
+    seen.add(d.id);
+    const status = (d.status ?? "online") as DeviceStatus;
+    if (!DEVICE_STATUSES.includes(status)) throw new Error(`DEVICES${where}: status inválido (${String(d.status)})`);
+    return { id: d.id, ...(typeof d.label === "string" && d.label ? { label: d.label } : {}), status };
+  });
+}
+
+/**
+ * `DEVICES` admite dos formas:
+ * - un arreglo `[{ id, label?, status? }]`: los mismos lectores para TODA instalación (sólo para la demo);
+ * - un objeto `{ "<installation_id>": [{ id, ... }] }`: cada instalación ve y cobra sólo en los suyos. Es lo que hace un procesador real.
+ */
+function parseDevices(raw: string): { devices: Device[]; devicesByInstallation: Record<string, Device[]> } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
     throw new Error("DEVICES no es JSON válido");
   }
-  if (!Array.isArray(parsed)) throw new Error("DEVICES tiene que ser un arreglo [{ id, label?, status? }]");
-  const seen = new Set<string>();
-  return parsed.map((item: unknown) => {
-    const d = (item ?? {}) as Record<string, unknown>;
-    if (typeof d.id !== "string" || !/^[\x21-\x7e]{1,200}$/.test(d.id)) throw new Error("DEVICES: cada lector necesita un id ASCII sin espacios (1 a 200)");
-    if (seen.has(d.id)) throw new Error(`DEVICES: id repetido (${d.id})`);
-    seen.add(d.id);
-    const status = (d.status ?? "online") as DeviceStatus;
-    if (!DEVICE_STATUSES.includes(status)) throw new Error(`DEVICES: status inválido (${String(d.status)})`);
-    return { id: d.id, ...(typeof d.label === "string" && d.label ? { label: d.label } : {}), status };
-  });
+  if (Array.isArray(parsed)) return { devices: parseDeviceList(parsed, ""), devicesByInstallation: {} };
+  if (parsed === null || typeof parsed !== "object") {
+    throw new Error('DEVICES tiene que ser un arreglo [{ id }] o un objeto { "<installation_id>": [{ id }] }');
+  }
+  const byInstallation: Record<string, Device[]> = {};
+  for (const [installation, list] of Object.entries(parsed)) byInstallation[installation] = parseDeviceList(list, ` (${installation})`);
+  return { devices: [], devicesByInstallation: byInstallation };
 }
 
 /**
@@ -117,7 +143,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig & { 
     adminToken: env.ADMIN_TOKEN || null,
     modes,
     cancel,
-    devices: env.DEVICES ? parseDevices(env.DEVICES) : DEFAULT_DEVICES.map((d) => ({ ...d })),
+    ...(env.DEVICES ? parseDevices(env.DEVICES) : { devices: DEFAULT_DEVICES.map((d) => ({ ...d })), devicesByInstallation: {} }),
     amountMin,
     amountMax,
     merchant,

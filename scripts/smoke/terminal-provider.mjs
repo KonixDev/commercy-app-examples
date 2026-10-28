@@ -27,7 +27,14 @@ await run("terminal-provider", async (t) => {
       COMMERCY_WEBHOOK_SECRET_PREVIOUS: previous,
       COMMERCY_API_BASE: commercyApi.base,
     },
-    env: { ADMIN_TOKEN: adminToken },
+    env: {
+      ADMIN_TOKEN: adminToken,
+      // Lectores POR instalación: inst_smoke no ve ni cobra en los de inst_otra.
+      DEVICES: JSON.stringify({
+        inst_smoke: [{ id: "reader_01", label: "Caja 1" }, { id: "reader_02", label: "Caja 2" }],
+        inst_otra: [{ id: "reader_otra", label: "Caja de otro comercio" }],
+      }),
+    },
   });
 
   const inst = "inst_smoke";
@@ -59,6 +66,14 @@ await run("terminal-provider", async (t) => {
     const res = postViaCli(url("devices"), { installation_id: inst, shop_id: shop }, secret);
     assert.equal(res.status, 200);
     assert.deepEqual(res.json.devices.map((d) => d.id), ["reader_01", "reader_02"]);
+  });
+
+  await t.step("lectores por instalación: la otra instalación ve sólo los suyos y nadie cobra en el lector ajeno", async () => {
+    const other = await postSigned(url("devices"), { installation_id: "inst_otra", shop_id: shop }, secret, { installation: "inst_otra" });
+    assert.deepEqual(other.json.devices.map((d) => d.id), ["reader_otra"]);
+    const cross = await postSigned(url("payments"), createBody(newRef(), { mode: "device", device_id: "reader_otra" }), secret);
+    assert.equal(cross.status, 422);
+    assert.equal(cross.json.error.code, "invalid_device");
   });
 
   await expectRejected(t, url("devices"), { installation_id: inst, shop_id: shop }, secret);

@@ -61,9 +61,26 @@ describe("notifyCommercy (pos_payment.updated)", () => {
     assert.equal(call.headers["x-commercy-signature"], "v1=" + crypto.createHmac("sha256", "whsec_actual").update(`${ts}.${call.raw}`).digest("hex"));
   });
 
-  it("202 (ya hay una consulta en curso para ese cobro) cuenta como entregado y no se reintenta", async () => {
+  it("202 (Commercy ya estaba consultando ese cobro) cuenta como entregado y se reintenta a los pocos segundos hasta que contesta 200", async () => {
+    const { base, calls } = await stub([202, 202, 200]);
+    const result = await notifyCommercy(base, "whsec_actual", payment, { ...quiet, retryDelaysMs: [5, 5, 5, 5] });
+    assert.deepEqual(result, { delivered: true, status: 202, retrying: true });
+    for (let i = 0; i < 100 && calls.length < 3; i += 1) await sleep(10);
+    await sleep(40);
+    assert.equal(calls.length, 3); // con el 200 deja de reintentar
+  });
+
+  it("si Commercy sigue en 202, se reintenta como máximo 3 veces más (4 requests en total)", async () => {
     const { base, calls } = await stub([202]);
-    assert.equal((await notifyCommercy(base, "whsec_actual", payment, { ...quiet, retryDelaysMs: [5] })).delivered, true);
+    await notifyCommercy(base, "whsec_actual", payment, { ...quiet, retryDelaysMs: [5, 5, 5, 5, 5, 5] });
+    for (let i = 0; i < 100 && calls.length < 4; i += 1) await sleep(10);
+    await sleep(60);
+    assert.equal(calls.length, 4);
+  });
+
+  it("un 200 a la primera no se reintenta", async () => {
+    const { base, calls } = await stub([200]);
+    assert.deepEqual(await notifyCommercy(base, "whsec_actual", payment, { ...quiet, retryDelaysMs: [5] }), { delivered: true, status: 200, retrying: false });
     await sleep(40);
     assert.equal(calls.length, 1);
   });

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import { notifyCommercy, verifyCommercyRequest, type Notify } from "./commercy.js";
-import type { AppConfig } from "./config.js";
+import { isSafeDeviceId, type AppConfig } from "./config.js";
 import { Store, type CreateBody, type Payment } from "./store.js";
 
 export interface AppOptions {
@@ -23,7 +23,6 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 
 /** `payment_ref` lo genera Commercy (32 caracteres [a-z0-9]), pero se aceptan hasta 36 [A-Za-z0-9_-] para que el contrato pueda evolucionar. */
 const REF_RE = /^[A-Za-z0-9_-]{1,36}$/;
-const PAYMENT_ID_RE = /^[\x21-\x7e]{1,200}$/;
 const MONEY_RE = /^\d{1,10}\.\d{2}$/;
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 
@@ -38,7 +37,7 @@ function createProblem(b: Record<string, unknown>): string | null {
   if (b.currency !== "ARS") return "currency (siempre ARS)";
   if (b.mode !== "device" && b.mode !== "qr" && b.mode !== "none") return "mode";
   if (b.mode === "device" && !isStr(b.device_id)) return "device_id (obligatorio en modo device)";
-  if (b.device_id !== undefined && (typeof b.device_id !== "string" || !PAYMENT_ID_RE.test(b.device_id))) return "device_id";
+  if (b.device_id !== undefined && !isSafeDeviceId(b.device_id)) return "device_id (1 a 128 caracteres A-Z a-z 0-9 _ . : -, sin \"..\")";
   if (typeof b.expires_at !== "string" || !ISO_RE.test(b.expires_at) || Number.isNaN(Date.parse(b.expires_at))) return "expires_at (ISO-8601 con zona)";
   if (typeof b.display_title !== "string" || !b.display_title || Array.from(b.display_title).length > 20) return "display_title (1 a 20 caracteres)";
   if (b.print_ticket !== undefined && typeof b.print_ticket !== "boolean") return "print_ticket";
@@ -222,15 +221,20 @@ export function createApp({ config, notify, log = console.log }: AppOptions) {
     res.json({ payment: view(p), webhook });
   });
 
-  // Estado de conexión de un lector: { "status": "online" | "offline" | "busy" | "unknown", "label"?: "Caja 3" }.
+  // Estado de conexión de un lector: { "status": "online" | "offline" | "busy" | "unknown", "label"?: "Caja 3", "installation_id"?: "..." }.
+  // Con `installation_id` crea el lector de esa instalación si no existe; sin él cambia el que ya existe con ese id, en todas.
   admin.post("/devices/:id", (req, res) => {
+    if (!isSafeDeviceId(req.params.id)) return void res.status(400).json({ error: "id de lector inválido: 1 a 128 caracteres A-Z a-z 0-9 _ . : -, sin \"..\"" });
     const status = isObj(req.body) ? req.body.status : undefined;
     if (status !== "online" && status !== "offline" && status !== "busy" && status !== "unknown") {
       return void res.status(400).json({ error: "status: online | offline | busy | unknown" });
     }
     const label = isObj(req.body) && typeof req.body.label === "string" ? req.body.label : undefined;
-    store.setDevice(req.params.id, status, label);
-    res.json({ devices: store.listDevices("") });
+    const installation = isObj(req.body) && isStr(req.body.installation_id) ? req.body.installation_id : undefined;
+    if (!store.setDevice(req.params.id, status, label, installation)) {
+      return void res.status(404).json({ error: "lector desconocido: pasá installation_id para crearlo en esa instalación" });
+    }
+    res.json({ devices: store.listDevices(installation ?? "") });
   });
 
   app.use("/admin", admin);
