@@ -1,0 +1,27 @@
+{
+  "name": "commercy-example-terminal-provider",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App de cobro presencial de ejemplo («Terminal Ejemplo») para el ecosistema de apps de Commercy: lectores, QR y transferencia en el POS y el kiosco, con aviso firmado hacia Commercy.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test --test-reporter=spec test/*.test.ts",
+    "smoke": "node ../../scripts/smoke/terminal-provider.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.14.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}
