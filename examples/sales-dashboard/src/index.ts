@@ -77,6 +77,11 @@ const log = (...args: unknown[]) => console.log(`[${new Date().toISOString()}]`,
 // ── Instalación (OAuth) ────────────────────────────────────────────────────
 
 app.get("/", (req, res) => {
+  // El botón «Instalar» del panel de Commercy abre la URL de la app con `?install=1&store=<id>`.
+  if (req.query.install === "1") {
+    res.redirect("/install");
+    return;
+  }
   const install = state.installation;
   if (install && req.query.raw === undefined) {
     res.redirect("/dashboard");
