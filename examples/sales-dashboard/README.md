@@ -68,15 +68,20 @@ en `APP_BASE_URL` y en el portal:
 
 1. **Redirect URI**: `https://algo.trycloudflare.com/callback`
 2. **Webhook URL**: `https://algo.trycloudflare.com/webhooks/commercy`
-3. Mandá un **ping de prueba** desde el portal: la app verifica el HMAC y responde `200`.
+3. **URL de la app**: `https://algo.trycloudflare.com` (o `http://localhost:3000` mientras la app está en borrador).
+4. Mandá un **ping de prueba** desde el portal: la app verifica el HMAC y responde `200`.
 
-Después abrí `http://localhost:3000/install`, aceptá el consentimiento con el
-usuario dueño de la tienda, y el dashboard queda en `http://localhost:3000/dashboard`.
+Para instalarla, entrá a tu tienda demo desde el portal, abrí **Apps**, elegí tu app
+y tocá **Instalar**: Commercy abre la URL de la app con `?install=1&store=<id>` y la
+app arranca el OAuth. También podés abrir `http://localhost:3000/install` directo.
+
+Después de aceptar el consentimiento con el usuario dueño de la tienda, el dashboard queda en `http://localhost:3000/dashboard`.
 
 ## Endpoints
 
 | Ruta | Qué hace |
 | - | - |
+| `GET /?install=1` | Lo abre el botón «Instalar» del panel: redirige a `/install`. |
 | `GET /install` | Arranca el flujo OAuth (genera PKCE + state). |
 | `GET /callback` | Canjea el `code` por tokens y guarda la instalación. |
 | `GET /dashboard` | El panel de ventas. |
